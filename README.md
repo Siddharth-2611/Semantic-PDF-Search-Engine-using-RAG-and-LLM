@@ -138,28 +138,6 @@ npm start
 
 ---
 
-## How RAG Works
-
-1. PDF text extracted using Apache PDFBox
-2. Text split into 500-word overlapping chunks
-3. Each chunk converted to 384-dimensional vector by all-MiniLM-L6-v2
-4. Vectors stored in memory; text stored in PostgreSQL
-5. User question embedded with same model
-6. Cosine similarity finds top-5 most relevant chunks
-7. LLM receives chunks as context and generates grounded answer
-
----
-
-## Future Improvements
-
-- [ ] Replace in-memory store with Pinecone or pgvector
-- [ ] User authentication and role-based document access
-- [ ] Multi-document chat with conversation history
-- [ ] PDF page highlighting for answer sources
-- [ ] Deploy on AWS with Docker
-
----
-
 ## License
 
 MIT
