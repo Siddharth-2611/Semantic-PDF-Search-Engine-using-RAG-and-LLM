@@ -16,28 +16,6 @@
 
 ---
 
-## 📸 Screenshots
-
-### Login Page
-![Login Page](screenshots/login.jpg)
-
-### OTP Verification
-![OTP Page](screenshots/otp.jpg)
-
-### Main Application
-![Main App](screenshots/main.jpg)
-
-### Database (PostgreSQL)
-![Database](screenshots/database1.jpg)
-
-#
-![Database](screenshots/database2.jpg)
-
-#
-![Database](screenshots/database3.jpg)
-
----
-
 ## 📌 What is this?
 
 **AI Document Search Engine** is a full-stack web application that allows users to upload PDF documents and ask questions in natural language. Instead of keyword search, the system understands the **meaning** of your question and finds the most relevant paragraphs using vector embeddings and cosine similarity. An LLM then reads those paragraphs and generates a precise, grounded answer with source citations.
@@ -58,7 +36,17 @@ Built using **Retrieval-Augmented Generation (RAG)** — the same architecture u
 - 🗑️ **Document Management** — list, filter, and delete documents
 
 ---
+## 📸 Screenshots
 
+| Section                | Preview |
+|-----------------------|---------|
+| **Login Page**        | ![Login Page](screenshots/login.jpg) |
+| **OTP Verification**  | ![OTP Page](screenshots/otp.jpg) |
+| **Main Application**  | ![Main App](screenshots/main.jpg) |
+| **Database (PostgreSQL)** | ![Database](screenshots/database1.jpg) |
+| **Database (PostgreSQL)** | ![Database](screenshots/database2.jpg) |
+| **Database (PostgreSQL)** | ![Database](screenshots/database3.jpg) |
+---
 ## 🏗️ Architecture
 
 ```
@@ -363,7 +351,3 @@ document_chunks (id UUID, document_id FK, chunk_index,
 MIT License — free to use for learning and projects.
 
 ---
-
-<div align="center">
-Made with ☕ and a lot of debugging
-</div>
