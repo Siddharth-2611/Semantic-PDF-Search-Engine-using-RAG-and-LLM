@@ -7,19 +7,29 @@ export function useDocuments() {
   const [error, setError] = useState(null);
 
   const fetch = useCallback(async () => {
+    // Don't fetch if no token — prevents 401 on startup
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     setLoading(true);
     try {
       const res = await api.listDocuments();
       setDocuments(res.data);
       setError(null);
     } catch (e) {
-      setError(e.message);
+      // Don't set error on 401/403 — interceptor handles redirect
+      if (e.response?.status !== 401 && e.response?.status !== 403) {
+        setError(e.message);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) fetch();
+  }, [fetch]);
 
   // Poll PROCESSING documents until READY/FAILED
   useEffect(() => {
