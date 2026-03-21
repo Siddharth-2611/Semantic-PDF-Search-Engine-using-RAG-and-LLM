@@ -11,65 +11,73 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Groq API - free, fast, no GPU needed.
- * Get free key at: https://console.groq.com
- * Free tier: 14,400 requests/day
- */
 @Slf4j
 @Service
 public class LlmService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${groq.api.key}")
+    @Value("${gemini.api.key}")
     private String apiKey;
 
-    @Value("${groq.model:llama3-8b-8192}")
+    @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
-
-    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
     public String generateAnswer(String question, List<String> contextChunks) {
         String context = String.join("\n\n---\n\n", contextChunks);
 
-        String systemPrompt = "You are a helpful assistant. Answer questions based ONLY on the provided document context. " +
-                "If the answer is not in the context, say: 'I could not find this information in the document.'";
+        String prompt = "You are a helpful assistant. Answer the question based ONLY on the context below.\n\n"
+                + "CONTEXT:\n" + context + "\n\n"
+                + "QUESTION: " + question + "\n\n"
+                + "If the answer is not in the context, say: "
+                + "'I could not find this information in the document.' "
+                + "Be concise and accurate.";
 
-        String userPrompt = "CONTEXT:\n" + context + "\n\nQUESTION: " + question + "\n\nAnswer concisely and accurately.";
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/"
+                + model + ":generateContent?key=" + apiKey;
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
 
             Map<String, Object> body = Map.of(
-                    "model", model,
-                    "messages", List.of(
-                            Map.of("role", "system", "content", systemPrompt),
-                            Map.of("role", "user",   "content", userPrompt)
+                    "contents", List.of(
+                            Map.of("parts", List.of(
+                                    Map.of("text", prompt)
+                            ))
                     ),
-                    "max_tokens", 512,
-                    "temperature", 0.3
+                    "generationConfig", Map.of(
+                            "temperature", 0.3,
+                            "maxOutputTokens", 512
+                    )
             );
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.postForObject(GROQ_URL, entity, Map.class);
+            Map<String, Object> response = restTemplate.postForObject(url, entity, Map.class);
 
-            if (response == null) return "No response from Groq API.";
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-            if (choices == null || choices.isEmpty()) return "Empty response from Groq.";
+            if (response == null) return "No response from Gemini.";
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-            return ((String) message.get("content")).trim();
+            List<Map<String, Object>> candidates =
+                    (List<Map<String, Object>>) response.get("candidates");
+
+            if (candidates == null || candidates.isEmpty())
+                return "Empty response from Gemini.";
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> content =
+                    (Map<String, Object>) candidates.get(0).get("content");
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> parts =
+                    (List<Map<String, Object>>) content.get("parts");
+
+            return ((String) parts.get(0).get("text")).trim();
 
         } catch (Exception e) {
-            log.error("Groq API error: {}", e.getMessage());
+            log.error("Gemini API error: {}", e.getMessage());
             return "Answer generation failed: " + e.getMessage();
         }
     }
