@@ -1,20 +1,13 @@
 package com.rag.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-
+import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "documents")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data @NoArgsConstructor @AllArgsConstructor @Builder
 public class Document {
 
     @Id
@@ -39,6 +32,10 @@ public class Document {
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     private ProcessingStatus status;
+
+    // Owner of this document
+    @Column(name = "owner_email", nullable = false)
+    private String ownerEmail;
 
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DocumentChunk> chunks;
