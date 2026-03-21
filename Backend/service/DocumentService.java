@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +37,13 @@ public class DocumentService {
     @Value("${rag.top-k:5}")
     private int defaultTopK;
 
+    // Get currently logged in user's email from JWT
+    private String currentUserEmail() {
+        return SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+    }
+
+    // ── Reload vectors on startup ─────────────────────────────────────────────
     @PostConstruct
     @Transactional(readOnly = true)
     public void reloadVectorIndex() {
@@ -49,20 +57,24 @@ public class DocumentService {
                 loaded++;
             }
         }
-        log.info("Loaded {} chunk vectors into memory index", loaded);
+        log.info("Loaded {} vectors into memory", loaded);
     }
 
+    // ── Upload ────────────────────────────────────────────────────────────────
     @Transactional
     public ApiDtos.DocumentUploadResponse uploadDocument(MultipartFile file) throws Exception {
         if (file.isEmpty()) throw new IllegalArgumentException("File is empty");
         if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf"))
             throw new IllegalArgumentException("Only PDF files are supported");
 
+        String email = currentUserEmail();
+
         Document doc = Document.builder()
                 .name(file.getOriginalFilename())
                 .originalFilename(file.getOriginalFilename())
                 .fileSize(file.getSize())
                 .status(Document.ProcessingStatus.UPLOADING)
+                .ownerEmail(email)   // tag document to this user
                 .build();
         doc = documentRepository.save(doc);
 
@@ -82,16 +94,14 @@ public class DocumentService {
     @Transactional
     public void processDocumentAsync(String docId, byte[] fileBytes) {
         Document doc = documentRepository.findById(docId)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + docId));
+                .orElseThrow(() -> new RuntimeException("Document not found"));
         try {
             doc.setStatus(Document.ProcessingStatus.PROCESSING);
             documentRepository.save(doc);
 
             String text = pdfParser.extractTextFromBytes(fileBytes);
-            log.info("[{}] Extracted {} chars", docId, text.length());
-
             List<String> chunks = chunker.chunk(text);
-            log.info("[{}] Created {} chunks", docId, chunks.size());
+            log.info("[{}] {} chunks created", docId, chunks.size());
 
             List<DocumentChunk> savedChunks = new ArrayList<>();
             for (int i = 0; i < chunks.size(); i++) {
@@ -107,14 +117,12 @@ public class DocumentService {
                 chunk = chunkRepository.save(chunk);
                 savedChunks.add(chunk);
                 vectorStore.add(chunk.getId(), docId, vector);
-
-                log.debug("[{}] Embedded chunk {}/{}", docId, i + 1, chunks.size());
             }
 
             doc.setTotalChunks(savedChunks.size());
             doc.setStatus(Document.ProcessingStatus.READY);
             documentRepository.save(doc);
-            log.info("[{}] Done. {} chunks indexed.", docId, savedChunks.size());
+            log.info("[{}] Processing complete", docId);
 
         } catch (Exception e) {
             log.error("[{}] Processing failed: {}", docId, e.getMessage(), e);
@@ -123,19 +131,35 @@ public class DocumentService {
         }
     }
 
+    // ── Query ─────────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public ApiDtos.QueryResponse query(ApiDtos.QueryRequest request) {
         long start = System.currentTimeMillis();
+        String email = currentUserEmail();
 
         if (request.getQuestion() == null || request.getQuestion().isBlank())
             throw new IllegalArgumentException("Question cannot be empty");
 
-        int topK = request.getTopK() != null ? request.getTopK() : defaultTopK;
+        // Validate the document belongs to this user
+        if (request.getDocumentId() != null) {
+            documentRepository.findByIdAndOwnerEmail(request.getDocumentId(), email)
+                    .orElseThrow(() -> new RuntimeException("Document not found"));
+        }
 
+        int topK = request.getTopK() != null ? request.getTopK() : defaultTopK;
         float[] queryVector = embeddingService.embed(request.getQuestion());
 
         List<InMemoryVectorStore.SearchResult> hits =
                 vectorStore.search(queryVector, topK, request.getDocumentId());
+
+        // Filter hits to only this user's documents
+        List<String> userDocIds = documentRepository
+                .findByOwnerEmailOrderByUploadTimeDesc(email)
+                .stream().map(Document::getId).toList();
+
+        hits = hits.stream()
+                .filter(h -> userDocIds.contains(h.documentId()))
+                .toList();
 
         if (hits.isEmpty()) {
             return ApiDtos.QueryResponse.builder()
@@ -154,15 +178,14 @@ public class DocumentService {
             chunks.stream().filter(c -> c.getId().equals(id)).findFirst().ifPresent(ordered::add);
         }
 
-        List<String> contextTexts = ordered.stream().map(DocumentChunk::getText).toList();
-        String answer = llmService.generateAnswer(request.getQuestion(), contextTexts);
+        String answer = llmService.generateAnswer(request.getQuestion(),
+                ordered.stream().map(DocumentChunk::getText).toList());
 
         List<ApiDtos.SourceChunk> sources = new ArrayList<>();
         for (DocumentChunk chunk : ordered) {
             double score = hits.stream()
                     .filter(h -> h.chunkId().equals(chunk.getId()))
                     .mapToDouble(InMemoryVectorStore.SearchResult::score).findFirst().orElse(0);
-
             sources.add(ApiDtos.SourceChunk.builder()
                     .documentId(chunk.getDocument().getId())
                     .documentName(chunk.getDocument().getName())
@@ -182,25 +205,30 @@ public class DocumentService {
                 .build();
     }
 
+    // ── List — only this user's docs ──────────────────────────────────────────
     @Transactional(readOnly = true)
     public List<ApiDtos.DocumentSummary> listDocuments() {
-        return documentRepository.findAllByOrderByUploadTimeDesc()
+        return documentRepository
+                .findByOwnerEmailOrderByUploadTimeDesc(currentUserEmail())
                 .stream().map(ApiDtos::toSummary).toList();
     }
 
+    // ── Delete — only if owner ────────────────────────────────────────────────
     @Transactional
     public void deleteDocument(String docId) {
-        Document doc = documentRepository.findById(docId)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + docId));
+        String email = currentUserEmail();
+        Document doc = documentRepository.findByIdAndOwnerEmail(docId, email)
+                .orElseThrow(() -> new RuntimeException("Document not found or access denied"));
         vectorStore.removeByDocument(docId);
         chunkRepository.deleteByDocumentId(docId);
         documentRepository.delete(doc);
+        log.info("Deleted document {} by user {}", docId, email);
     }
 
     @Transactional(readOnly = true)
     public ApiDtos.DocumentSummary getDocument(String docId) {
-        return documentRepository.findById(docId)
+        return documentRepository.findByIdAndOwnerEmail(docId, currentUserEmail())
                 .map(ApiDtos::toSummary)
-                .orElseThrow(() -> new RuntimeException("Document not found: " + docId));
+                .orElseThrow(() -> new RuntimeException("Document not found or access denied"));
     }
 }
