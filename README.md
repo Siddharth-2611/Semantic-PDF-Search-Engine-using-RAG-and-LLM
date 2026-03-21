@@ -19,22 +19,22 @@
 ## 📸 Screenshots
 
 ### Login Page
-![Login Page](screenshots/login.png)
+![Login Page](screenshots/login.jpg)
 
 ### OTP Verification
-![OTP Page](screenshots/otp.png)
+![OTP Page](screenshots/otp.jpg)
 
 ### Main Application
-![Main App](screenshots/main.png)
+![Main App](screenshots/main.jpg)
 
 ### Database (PostgreSQL)
-![Database](screenshots/database1.png)
+![Database](screenshots/database1.jpg)
 
 #
-![Database](screenshots/database2.png)
+![Database](screenshots/database2.jpg)
 
 #
-![Database](screenshots/database3.png)
+![Database](screenshots/database3.jpg)
 
 ---
 
