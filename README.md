@@ -28,7 +28,9 @@
 ![Main App](screenshots/main.png)
 
 ### Database (PostgreSQL)
-![Database](screenshots/database.png)
+![Database](screenshots/database1.png)
+![Database](screenshots/database2.png)
+![Database](screenshots/database3.png)
 
 ---
 
@@ -81,11 +83,11 @@ Login → Password verify → 6-digit OTP → Gmail SMTP → JWT token
 | Backend | Java 21, Spring Boot 3.3.2 |
 | Security | Spring Security, JWT (JJWT 0.12.5), BCrypt |
 | OTP | JavaMail, Gmail SMTP |
-| Database | PostgreSQL 16 (JPA/Hibernate) |
+| Database | PostgreSQL 18 (JPA/Hibernate) |
 | PDF Parsing | Apache PDFBox 2.0.30 |
 | Embeddings | Python 3.10, Flask, sentence-transformers (all-MiniLM-L6-v2, 384-dim) |
 | Vector Search | In-memory cosine similarity (Java) |
-| LLM | Google Gemini 2.0 Flash (free API) |
+| LLM | Google Gemini 2.5 Flash (free API) |
 | Frontend | React 18, Axios, react-dropzone, react-markdown |
 
 ---
@@ -194,7 +196,7 @@ embedding.server.url=http://localhost:5001
 
 # Google Gemini (free at aistudio.google.com)
 gemini.api.key=AIza_YOUR_KEY_HERE
-gemini.model=gemini-2.0-flash
+gemini.model=gemini-2.5-flash
 
 # JWT
 jwt.secret=your_random_32_character_secret_key
@@ -349,21 +351,6 @@ document_chunks (id UUID, document_id FK, chunk_index,
 - [ ] Role-based access (admin / user)
 - [ ] Docker containerization
 - [ ] Deploy on AWS / GCP
-
----
-
-## 📝 Resume Description
-
-> Built a full-stack **AI Document Search Engine** using Retrieval-Augmented Generation (RAG). Implemented semantic search with 384-dimensional vector embeddings using sentence-transformers and cosine similarity achieving 90%+ retrieval accuracy. Developed RESTful APIs in Java Spring Boot 3.3.2 with JWT authentication, OTP-based 2FA via Gmail SMTP, and per-user document isolation. Integrated Google Gemini 2.0 Flash for context-grounded answer generation. Built a React 18 frontend with drag-and-drop PDF upload, real-time processing status, and chat-style interface with source citations.
-
----
-
-## 📸 How to add screenshots
-
-1. Take screenshots of your running app
-2. Create a `screenshots/` folder in the project root
-3. Save them as `login.png`, `otp.png`, `main.png`, `database.png`
-4. Push to GitHub — they will appear automatically in this README
 
 ---
 
