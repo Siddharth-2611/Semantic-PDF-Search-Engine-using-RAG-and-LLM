@@ -1,9 +1,28 @@
 import axios from 'axios';
 
-const BASE = '/api';
+const BASE = (process.env.REACT_APP_API_URL || '') + '/api';
+
+// Attach JWT token to every request automatically
+axios.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// If token expired — redirect to login (no reload loop)
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const api = {
-  // Upload a PDF
   upload: (file, onProgress) => {
     const form = new FormData();
     form.append('file', file);
@@ -12,21 +31,11 @@ export const api = {
       onUploadProgress: e => onProgress && onProgress(Math.round((e.loaded * 100) / e.total)),
     });
   },
-
-  // Ask a question
   ask: (question, documentId = null, topK = 5) =>
     axios.post(`${BASE}/ask`, { question, documentId, topK }),
-
-  // List all documents
   listDocuments: () => axios.get(`${BASE}/documents`),
-
-  // Get single document
   getDocument: (id) => axios.get(`${BASE}/documents/${id}`),
-
-  // Delete document
   deleteDocument: (id) => axios.delete(`${BASE}/documents/${id}`),
-
-  // Health check
   health: () => axios.get(`${BASE}/health`),
 };
 
