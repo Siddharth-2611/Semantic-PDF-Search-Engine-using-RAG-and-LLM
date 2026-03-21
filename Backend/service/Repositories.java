@@ -11,7 +11,11 @@ import java.util.Optional;
 
 @Repository
 interface DocumentRepository extends JpaRepository<Document, String> {
-    List<Document> findAllByOrderByUploadTimeDesc();
+    // Only return documents belonging to this user
+    List<Document> findByOwnerEmailOrderByUploadTimeDesc(String ownerEmail);
+
+    // Find doc only if it belongs to this user (prevents accessing other users' docs)
+    Optional<Document> findByIdAndOwnerEmail(String id, String ownerEmail);
 }
 
 @Repository
